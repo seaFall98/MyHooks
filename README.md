@@ -11,14 +11,15 @@
 功能：
 
 - `PermissionRequest`：在 Claude Code 请求工具权限时弹出窗口。
-  - **允许本次**：本次工具调用直接通过。
-  - **拒绝**：本次工具调用被拒绝。
-  - **回到终端选择**：不在弹窗中决策，回退到 Claude Code 原始终端权限确认。
+  - **Yes**：本次工具调用直接通过。
+  - **Yes, don't ask again**：本次通过，并尽量应用 Claude Code 提供的 `permission_suggestions`，减少后续重复确认。
+  - **No**：本次工具调用被拒绝。
+  - **Terminal**：不在弹窗中决策，回退到 Claude Code 原始终端权限确认。
 - `Notification` / `idle_prompt`：Claude Code 任务结束进入空闲等待时弹出通知。
 
 特点：
 
-- 面向 Windows 使用体验优化。
+- 面向 Windows 使用体验优化，提供更接近桌面应用的卡片式弹窗界面。
 - 使用 Python 标准库 `tkinter`，不需要安装第三方依赖。
 - hook 出错时不会中断 Claude Code 主流程。
 
@@ -143,9 +144,12 @@ popup_hook.py ok
 
 当用户在弹窗中选择：
 
-- 允许：输出 `PermissionRequest` 的 `allow` 决策。
-- 拒绝：输出 `PermissionRequest` 的 `deny` 决策。
-- 回到终端选择：不输出权限决策，让 Claude Code 使用原始权限提示继续处理。
+- `Yes`：输出 `PermissionRequest` 的 `allow` 决策。
+- `Yes, don't ask again`：输出 `allow` 决策，并在收到 Claude Code `permission_suggestions` 时把第一条建议写入 `updatedPermissions`，相当于接受 Claude Code 给出的“以后不再询问”权限更新。
+- `No`：输出 `PermissionRequest` 的 `deny` 决策。
+- `Terminal`：不输出权限决策，让 Claude Code 使用原始权限提示继续处理。
+
+> 注意：`Yes, don't ask again` 依赖 Claude Code 在 `PermissionRequest` 输入中提供 `permission_suggestions`。如果当前请求没有建议规则，该按钮会退化为仅允许本次。
 
 `Notification` hook 用于处理 `idle_prompt`，只负责弹窗提醒，不阻塞或修改 Claude Code 的后续行为。
 

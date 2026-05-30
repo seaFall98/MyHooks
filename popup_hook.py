@@ -10,10 +10,28 @@ from __future__ import annotations
 import json
 import sys
 import tkinter as tk
-from tkinter import messagebox, scrolledtext
+from tkinter import messagebox, scrolledtext, ttk
 
 
 MAX_PREVIEW_CHARS = 6000
+FONT_FAMILY = "Microsoft YaHei UI"
+COLORS = {
+    "bg": "#f6f8fb",
+    "card": "#ffffff",
+    "border": "#d8dee9",
+    "text": "#1f2937",
+    "muted": "#64748b",
+    "primary": "#2563eb",
+    "primary_hover": "#1d4ed8",
+    "success": "#16a34a",
+    "success_hover": "#15803d",
+    "danger": "#dc2626",
+    "danger_hover": "#b91c1c",
+    "secondary": "#e5e7eb",
+    "secondary_hover": "#d1d5db",
+    "code_bg": "#0f172a",
+    "code_fg": "#e5e7eb",
+}
 
 
 def read_payload() -> dict:
@@ -53,81 +71,241 @@ def center(win: tk.Tk, width: int, height: int) -> None:
 def make_root(title: str, width: int, height: int) -> tk.Tk:
     root = tk.Tk()
     root.title(title)
+    root.configure(bg=COLORS["bg"])
     root.attributes("-topmost", True)
     root.resizable(True, True)
     center(root, width, height)
     try:
-        root.after(250, lambda: root.attributes("-topmost", False))
+        root.after(300, lambda: root.attributes("-topmost", False))
         root.bell()
     except Exception:
         pass
     return root
 
 
-def permission_dialog(payload: dict) -> str:
-    """Return allow, deny, or defer."""
+def style_ttk(root: tk.Tk) -> None:
+    style = ttk.Style(root)
+    try:
+        style.theme_use("clam")
+    except tk.TclError:
+        pass
+    style.configure("TFrame", background=COLORS["bg"])
+    style.configure("Card.TFrame", background=COLORS["card"], relief="flat")
+    style.configure("Muted.TLabel", background=COLORS["card"], foreground=COLORS["muted"], font=(FONT_FAMILY, 9))
+    style.configure("Title.TLabel", background=COLORS["card"], foreground=COLORS["text"], font=(FONT_FAMILY, 16, "bold"))
+    style.configure("Subtitle.TLabel", background=COLORS["card"], foreground=COLORS["muted"], font=(FONT_FAMILY, 10))
+    style.configure("Tool.TLabel", background=COLORS["primary"], foreground="#ffffff", font=(FONT_FAMILY, 10, "bold"), padding=(10, 4))
+
+
+def button(parent, text: str, command, bg: str, hover_bg: str, fg: str = "#ffffff") -> tk.Button:
+    btn = tk.Button(
+        parent,
+        text=text,
+        command=command,
+        bg=bg,
+        fg=fg,
+        activebackground=hover_bg,
+        activeforeground=fg,
+        relief="flat",
+        bd=0,
+        padx=14,
+        pady=10,
+        cursor="hand2",
+        font=(FONT_FAMILY, 10, "bold"),
+    )
+    btn.bind("<Enter>", lambda _event: btn.configure(bg=hover_bg))
+    btn.bind("<Leave>", lambda _event: btn.configure(bg=bg))
+    return btn
+
+
+def first_permission_suggestion(payload: dict):
+    suggestions = payload.get("permission_suggestions") or []
+    if isinstance(suggestions, list) and suggestions:
+        return suggestions[0]
+    return None
+
+
+def suggestion_summary(suggestion) -> str:
+    if not suggestion:
+        return "没有收到 Claude Code 的权限规则建议；此按钮将只允许本次。"
+    if isinstance(suggestion, dict):
+        destination = suggestion.get("destination", "unknown")
+        behavior = suggestion.get("behavior", "allow")
+        rules = suggestion.get("rules") or []
+        if rules:
+            rendered_rules = ", ".join(
+                f"{rule.get('toolName', '*')}({rule.get('ruleContent', '')})" if isinstance(rule, dict) else str(rule)
+                for rule in rules[:3]
+            )
+            if len(rules) > 3:
+                rendered_rules += f", +{len(rules) - 3} more"
+            return f"将添加 {behavior} 规则到 {destination}: {rendered_rules}"
+        return f"将应用权限更新到 {destination}: {suggestion.get('type', 'permission update')}"
+    return pretty(suggestion)
+
+
+def permission_dialog(payload: dict) -> dict:
+    """Return a result with action: allow, allow_remember, deny, or defer."""
     tool_name = payload.get("tool_name", "Unknown tool")
     tool_input = payload.get("tool_input", {})
-    suggestions = payload.get("permission_suggestions") or []
+    suggestion = first_permission_suggestion(payload)
 
-    root = make_root("Claude Code 权限申请", 760, 560)
+    root = make_root("Claude Code 权限申请", 860, 640)
+    style_ttk(root)
     root.columnconfigure(0, weight=1)
-    root.rowconfigure(2, weight=1)
+    root.rowconfigure(0, weight=1)
+
+    container = tk.Frame(root, bg=COLORS["bg"], padx=18, pady=18)
+    container.grid(row=0, column=0, sticky="nsew")
+    container.columnconfigure(0, weight=1)
+    container.rowconfigure(0, weight=1)
+
+    card = tk.Frame(container, bg=COLORS["card"], highlightthickness=1, highlightbackground=COLORS["border"])
+    card.grid(row=0, column=0, sticky="nsew")
+    card.columnconfigure(0, weight=1)
+    card.rowconfigure(3, weight=1)
+
+    header = tk.Frame(card, bg=COLORS["card"], padx=22, pady=18)
+    header.grid(row=0, column=0, sticky="ew")
+    header.columnconfigure(1, weight=1)
+
+    icon = tk.Label(
+        header,
+        text="⚡",
+        bg=COLORS["primary"],
+        fg="#ffffff",
+        font=(FONT_FAMILY, 18, "bold"),
+        width=3,
+        height=1,
+    )
+    icon.grid(row=0, column=0, rowspan=2, sticky="nw", padx=(0, 14))
 
     title = tk.Label(
-        root,
-        text=f"Claude Code 请求使用：{tool_name}",
-        font=("Microsoft YaHei UI", 14, "bold"),
+        header,
+        text="Claude Code 请求权限",
+        bg=COLORS["card"],
+        fg=COLORS["text"],
+        font=(FONT_FAMILY, 17, "bold"),
         anchor="w",
-        padx=16,
-        pady=12,
     )
-    title.grid(row=0, column=0, sticky="ew")
+    title.grid(row=0, column=1, sticky="ew")
 
-    hint = tk.Label(
-        root,
-        text="请选择允许、拒绝，或返回终端使用 Claude Code 原始确认界面。",
+    subtitle = tk.Label(
+        header,
+        text="请确认是否允许下面的工具调用。Enter 允许本次，Esc 返回终端。",
+        bg=COLORS["card"],
+        fg=COLORS["muted"],
+        font=(FONT_FAMILY, 10),
         anchor="w",
-        padx=16,
+    )
+    subtitle.grid(row=1, column=1, sticky="ew", pady=(4, 0))
+
+    tool_row = tk.Frame(card, bg=COLORS["card"], padx=22)
+    tool_row.grid(row=1, column=0, sticky="ew")
+    tk.Label(
+        tool_row,
+        text="工具",
+        bg=COLORS["card"],
+        fg=COLORS["muted"],
+        font=(FONT_FAMILY, 9, "bold"),
+    ).pack(side=tk.LEFT)
+    tk.Label(
+        tool_row,
+        text=str(tool_name),
+        bg=COLORS["primary"],
+        fg="#ffffff",
+        font=(FONT_FAMILY, 10, "bold"),
+        padx=10,
         pady=4,
-        fg="#555555",
+    ).pack(side=tk.LEFT, padx=(10, 0))
+
+    remember_text = suggestion_summary(suggestion)
+    remember_row = tk.Frame(card, bg="#eff6ff", padx=14, pady=10, highlightthickness=1, highlightbackground="#bfdbfe")
+    remember_row.grid(row=2, column=0, sticky="ew", padx=22, pady=(14, 8))
+    tk.Label(
+        remember_row,
+        text="Don't ask again",
+        bg="#eff6ff",
+        fg=COLORS["primary"],
+        font=(FONT_FAMILY, 9, "bold"),
+    ).pack(anchor="w")
+    tk.Label(
+        remember_row,
+        text=remember_text,
+        bg="#eff6ff",
+        fg=COLORS["text"],
+        font=(FONT_FAMILY, 9),
+        wraplength=760,
+        justify="left",
+    ).pack(anchor="w", pady=(3, 0))
+
+    preview_frame = tk.Frame(card, bg=COLORS["card"], padx=22, pady=8)
+    preview_frame.grid(row=3, column=0, sticky="nsew")
+    preview_frame.columnconfigure(0, weight=1)
+    preview_frame.rowconfigure(1, weight=1)
+
+    tk.Label(
+        preview_frame,
+        text="Tool input preview",
+        bg=COLORS["card"],
+        fg=COLORS["muted"],
+        font=(FONT_FAMILY, 9, "bold"),
+        anchor="w",
+    ).grid(row=0, column=0, sticky="ew", pady=(0, 6))
+
+    preview = scrolledtext.ScrolledText(
+        preview_frame,
+        wrap=tk.WORD,
+        padx=12,
+        pady=12,
+        relief="flat",
+        bd=0,
+        bg=COLORS["code_bg"],
+        fg=COLORS["code_fg"],
+        insertbackground=COLORS["code_fg"],
+        font=("Consolas", 10),
     )
-    hint.grid(row=1, column=0, sticky="ew")
-
-    preview = scrolledtext.ScrolledText(root, wrap=tk.WORD, padx=10, pady=10)
-    preview.insert(tk.END, "Tool input:\n")
     preview.insert(tk.END, clip(pretty(tool_input)))
-    if suggestions:
-        preview.insert(tk.END, "\n\nPermission suggestions:\n")
-        preview.insert(tk.END, clip(pretty(suggestions)))
     preview.configure(state="disabled")
-    preview.grid(row=2, column=0, sticky="nsew", padx=16, pady=10)
+    preview.grid(row=1, column=0, sticky="nsew")
 
-    result = {"value": "defer"}
+    result = {"action": "defer", "suggestion": suggestion}
 
-    def choose(value: str) -> None:
-        result["value"] = value
+    def choose(action: str) -> None:
+        result["action"] = action
         root.destroy()
 
-    buttons = tk.Frame(root, padx=16, pady=14)
-    buttons.grid(row=3, column=0, sticky="ew")
-    buttons.columnconfigure((0, 1, 2), weight=1)
+    footer = tk.Frame(card, bg=COLORS["card"], padx=22, pady=18)
+    footer.grid(row=4, column=0, sticky="ew")
+    footer.columnconfigure((0, 1, 2, 3), weight=1)
 
-    tk.Button(buttons, text="允许本次", command=lambda: choose("allow"), height=2).grid(
+    button(footer, "Yes", lambda: choose("allow"), COLORS["success"], COLORS["success_hover"]).grid(
         row=0, column=0, sticky="ew", padx=(0, 8)
     )
-    tk.Button(buttons, text="拒绝", command=lambda: choose("deny"), height=2).grid(
-        row=0, column=1, sticky="ew", padx=8
+    button(
+        footer,
+        "Yes, don't ask again",
+        lambda: choose("allow_remember"),
+        COLORS["primary"],
+        COLORS["primary_hover"],
+    ).grid(row=0, column=1, sticky="ew", padx=8)
+    button(footer, "No", lambda: choose("deny"), COLORS["danger"], COLORS["danger_hover"]).grid(
+        row=0, column=2, sticky="ew", padx=8
     )
-    tk.Button(buttons, text="回到终端选择", command=lambda: choose("defer"), height=2).grid(
-        row=0, column=2, sticky="ew", padx=(8, 0)
-    )
+    button(
+        footer,
+        "Terminal",
+        lambda: choose("defer"),
+        COLORS["secondary"],
+        COLORS["secondary_hover"],
+        fg=COLORS["text"],
+    ).grid(row=0, column=3, sticky="ew", padx=(8, 0))
 
     root.protocol("WM_DELETE_WINDOW", lambda: choose("defer"))
     root.bind("<Escape>", lambda _event: choose("defer"))
     root.bind("<Return>", lambda _event: choose("allow"))
     root.mainloop()
-    return result["value"]
+    return result
 
 
 def notification_popup(payload: dict) -> None:
@@ -150,23 +328,38 @@ def notification_popup(payload: dict) -> None:
         root.destroy()
 
 
-def emit_permission_decision(decision: str) -> None:
-    if decision in {"allow", "deny"}:
-        print(
-            json.dumps(
-                {
-                    "hookSpecificOutput": {
-                        "hookEventName": "PermissionRequest",
-                        "decision": {"behavior": decision},
-                    },
-                    "suppressOutput": True,
-                },
-                ensure_ascii=False,
-            )
-        )
+def emit_permission_result(result: dict) -> None:
+    action = result.get("action")
+    if action == "allow":
+        decision = {"behavior": "allow"}
+    elif action == "allow_remember":
+        decision = {"behavior": "allow"}
+        suggestion = result.get("suggestion")
+        if suggestion:
+            decision["updatedPermissions"] = [suggestion]
+    elif action == "deny":
+        decision = {
+            "behavior": "deny",
+            "message": "Denied from Claude Code popup hook.",
+            "interrupt": True,
+        }
     else:
         # No decision: let Claude Code show its normal terminal permission prompt.
         print(json.dumps({"suppressOutput": True}, ensure_ascii=False))
+        return
+
+    print(
+        json.dumps(
+            {
+                "hookSpecificOutput": {
+                    "hookEventName": "PermissionRequest",
+                    "decision": decision,
+                },
+                "suppressOutput": True,
+            },
+            ensure_ascii=False,
+        )
+    )
 
 
 def main(argv: list[str]) -> int:
@@ -175,8 +368,8 @@ def main(argv: list[str]) -> int:
 
     try:
         if mode == "permission":
-            decision = permission_dialog(payload)
-            emit_permission_decision(decision)
+            result = permission_dialog(payload)
+            emit_permission_result(result)
         elif mode == "notification":
             notification_popup(payload)
             print(json.dumps({"suppressOutput": True}, ensure_ascii=False))
