@@ -45,10 +45,10 @@ PY
 可以把本仓库 clone 到任意本地目录，例如：
 
 ```bash
-git clone https://github.com/<your-github-username>/MyHooks.git D:/MyCode/MyHooks
+git clone https://github.com/<your-github-username>/MyHooks.git <your-local-hooks-dir>
 ```
 
-也可以直接下载 `popup_hook.py` 到本地目录。
+也可以直接下载 `popup_hook.py` 到任意本地目录。
 
 ## Claude Code 全局配置示例
 
@@ -71,7 +71,7 @@ C:\Users\<你的用户名>\.claude\settings.json
             "type": "command",
             "command": "python",
             "args": [
-              "D:\\MyCode\\MyHooks\\popup_hook.py",
+              "<your-local-hooks-dir>\\popup_hook.py",
               "permission"
             ],
             "timeout": 600,
@@ -88,7 +88,7 @@ C:\Users\<你的用户名>\.claude\settings.json
             "type": "command",
             "command": "python",
             "args": [
-              "D:\\MyCode\\MyHooks\\popup_hook.py",
+              "<your-local-hooks-dir>\\popup_hook.py",
               "notification"
             ],
             "timeout": 300,
@@ -103,19 +103,9 @@ C:\Users\<你的用户名>\.claude\settings.json
 
 如果你的 `settings.json` 已经有其它配置，不要整体替换，手动把 `hooks` 部分合并进去。
 
-## 当前用户配置示例
+## 路径填写说明
 
-如果仓库位于：
-
-```text
-D:\MyCode\MyHooks
-```
-
-则脚本路径为：
-
-```text
-D:\MyCode\MyHooks\popup_hook.py
-```
+请把配置示例中的 `<your-local-hooks-dir>` 替换为你实际保存本仓库的本地目录。例如 Windows 路径需要在 JSON 字符串中使用双反斜杠转义。
 
 ## 验证
 
