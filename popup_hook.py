@@ -34,9 +34,32 @@ COLORS = {
 }
 
 
+def read_stdin_text() -> str:
+    """Read hook input as UTF-8 regardless of the Windows console code page."""
+    try:
+        return sys.stdin.buffer.read().decode("utf-8-sig")
+    except Exception:
+        return sys.stdin.read()
+
+
+def write_stdout_text(text: str) -> None:
+    """Write hook output as UTF-8 so Chinese JSON content is not mojibake."""
+    data = (text + "\n").encode("utf-8")
+    try:
+        sys.stdout.buffer.write(data)
+        sys.stdout.buffer.flush()
+    except Exception:
+        sys.stdout.write(text + "\n")
+        sys.stdout.flush()
+
+
+def emit_json(value: dict) -> None:
+    write_stdout_text(json.dumps(value, ensure_ascii=False))
+
+
 def read_payload() -> dict:
     try:
-        raw = sys.stdin.read()
+        raw = read_stdin_text()
         if not raw.strip():
             return {}
         return json.loads(raw)
@@ -345,48 +368,41 @@ def emit_permission_result(result: dict) -> None:
         }
     else:
         # No decision: let Claude Code show its normal terminal permission prompt.
-        print(json.dumps({"suppressOutput": True}, ensure_ascii=False))
+        emit_json({"suppressOutput": True})
         return
 
-    print(
-        json.dumps(
-            {
-                "hookSpecificOutput": {
-                    "hookEventName": "PermissionRequest",
-                    "decision": decision,
-                },
-                "suppressOutput": True,
+    emit_json(
+        {
+            "hookSpecificOutput": {
+                "hookEventName": "PermissionRequest",
+                "decision": decision,
             },
-            ensure_ascii=False,
-        )
+            "suppressOutput": True,
+        }
     )
 
 
 def main(argv: list[str]) -> int:
     mode = argv[1] if len(argv) > 1 else "notification"
-    payload = read_payload()
 
     try:
         if mode == "permission":
-            result = permission_dialog(payload)
+            result = permission_dialog(read_payload())
             emit_permission_result(result)
         elif mode == "notification":
-            notification_popup(payload)
-            print(json.dumps({"suppressOutput": True}, ensure_ascii=False))
+            notification_popup(read_payload())
+            emit_json({"suppressOutput": True})
         elif mode == "test":
-            print("popup_hook.py ok")
+            write_stdout_text("popup_hook.py ok")
         else:
-            print(json.dumps({"suppressOutput": True}, ensure_ascii=False))
+            emit_json({"suppressOutput": True})
     except Exception as exc:
         # Hooks should not break Claude Code. Surface the issue as context if needed.
-        print(
-            json.dumps(
-                {
-                    "systemMessage": "Claude Code popup hook failed: " + str(exc),
-                    "suppressOutput": False,
-                },
-                ensure_ascii=False,
-            )
+        emit_json(
+            {
+                "systemMessage": "Claude Code popup hook failed: " + str(exc),
+                "suppressOutput": False,
+            }
         )
         return 0
     return 0

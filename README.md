@@ -1,6 +1,6 @@
-# MyHooks
+# claude-popup-hooks
 
-个人 Claude Code hooks 集中管理仓库。
+个人 Claude Code 桌面弹窗 hooks 仓库。
 
 当前包含一个 Windows 桌面弹窗 hook：把 Claude Code 的权限申请和空闲通知转成可交互的系统弹窗，方便在离开终端或多窗口工作时及时处理。
 
@@ -45,7 +45,7 @@ PY
 可以把本仓库 clone 到任意本地目录，例如：
 
 ```bash
-git clone https://github.com/<your-github-username>/MyHooks.git <your-local-hooks-dir>
+git clone https://github.com/<your-github-username>/claude-popup-hooks.git <your-local-hooks-dir>
 ```
 
 也可以直接下载 `popup_hook.py` 到任意本地目录。
