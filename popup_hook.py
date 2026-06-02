@@ -142,10 +142,47 @@ def button(parent, text: str, command, bg: str, hover_bg: str, fg: str = "#fffff
 
 
 def first_permission_suggestion(payload: dict):
-    suggestions = payload.get("permission_suggestions") or []
+    suggestions = payload.get("permission_suggestions") or payload.get("permissionSuggestions") or []
     if isinstance(suggestions, list) and suggestions:
         return suggestions[0]
     return None
+
+
+def payload_field(payload: dict, *names: str):
+    for name in names:
+        value = payload.get(name)
+        if value not in (None, "", {}, []):
+            return value
+    return None
+
+
+def permission_reason(payload: dict):
+    return payload_field(
+        payload,
+        "message",
+        "reason",
+        "permission_reason",
+        "permissionReason",
+        "permission_prompt",
+        "permissionPrompt",
+        "description",
+        "warning",
+    )
+
+
+def preview_text(payload: dict, tool_input) -> str:
+    sections = []
+    reason = permission_reason(payload)
+    if reason:
+        sections.append("Permission message / reason:\n" + pretty(reason))
+
+    if tool_input not in (None, "", {}, []):
+        sections.append("Tool input:\n" + pretty(tool_input))
+    else:
+        sections.append("Tool input: (empty; showing full hook payload below)")
+
+    sections.append("Full hook payload:\n" + pretty(payload))
+    return clip("\n\n---\n\n".join(sections))
 
 
 def suggestion_summary(suggestion) -> str:
@@ -169,8 +206,8 @@ def suggestion_summary(suggestion) -> str:
 
 def permission_dialog(payload: dict) -> dict:
     """Return a result with action: allow, allow_remember, deny, or defer."""
-    tool_name = payload.get("tool_name", "Unknown tool")
-    tool_input = payload.get("tool_input", {})
+    tool_name = payload_field(payload, "tool_name", "toolName", "tool") or "Unknown tool"
+    tool_input = payload_field(payload, "tool_input", "toolInput", "input") or {}
     suggestion = first_permission_suggestion(payload)
 
     root = make_root("Claude Code 权限申请", 860, 640)
@@ -288,7 +325,7 @@ def permission_dialog(payload: dict) -> dict:
         insertbackground=COLORS["code_fg"],
         font=("Consolas", 10),
     )
-    preview.insert(tk.END, clip(pretty(tool_input)))
+    preview.insert(tk.END, preview_text(payload, tool_input))
     preview.configure(state="disabled")
     preview.grid(row=1, column=0, sticky="nsew")
 
