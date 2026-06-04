@@ -112,7 +112,7 @@ C:\Users\<你的用户名>\.claude\settings.json
 验证脚本可运行：
 
 ```bash
-python D:/MyCode/MyHooks/popup_hook.py test
+python <your-local-hooks-dir>/popup_hook.py test
 ```
 
 预期输出：
